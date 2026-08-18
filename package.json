@@ -1,0 +1,14 @@
+{
+  "name": "gold-crm-analytics-root",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "npm --prefix \"OneDrive/Documents/CC TOOL/Gold CRM Analytics\" run dev --",
+    "build": "npm --prefix \"OneDrive/Documents/CC TOOL/Gold CRM Analytics\" run build --",
+    "lint": "npm --prefix \"OneDrive/Documents/CC TOOL/Gold CRM Analytics\" run lint --",
+    "preview": "npm --prefix \"OneDrive/Documents/CC TOOL/Gold CRM Analytics\" run preview --",
+    "deploy:preview": "npm --prefix \"OneDrive/Documents/CC TOOL/Gold CRM Analytics\" run deploy:preview --",
+    "deploy:prod": "npm --prefix \"OneDrive/Documents/CC TOOL/Gold CRM Analytics\" run deploy:prod --"
+  }
+}
