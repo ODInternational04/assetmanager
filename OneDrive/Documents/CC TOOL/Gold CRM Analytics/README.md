@@ -84,6 +84,20 @@ npm run dev -- --host 0.0.0.0 --port 5174
 
 Then open `http://localhost:5174/`.
 
+### Run from repository root (recommended)
+
+The git repo is tracked from `C:\Users\PC`, so run from that root:
+
+```bash
+cd C:\Users\PC
+npm run dev
+npm run build
+npm run lint
+npm run preview
+```
+
+Vercel is configured at repository root and builds from `OneDrive/Documents/CC TOOL/Gold CRM Analytics` automatically.
+
 ## API route (Vercel)
 
 A serverless function is available at:
@@ -96,7 +110,7 @@ Example:
 
 ```bash
 GET /api/zoho?module=Deals&per_page=200
-``
+```
 
 Example response shape:
 
