@@ -1,0 +1,52 @@
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800&family=Nunito:wght@400;600;700&display=swap');
+
+:root {
+  --bg: #eff3ff;
+  --panel: #ffffff;
+  --text: #172554;
+  --muted: #526080;
+  --border: #dde3f2;
+  --line-soft: #dce5ff;
+  --line-strong: #4f46e5;
+  --sans: 'Nunito', 'Trebuchet MS', 'Segoe UI', sans-serif;
+  --heading: 'Manrope', 'Avenir Next', 'Segoe UI', sans-serif;
+
+  font: 16px/145% var(--sans);
+  color: var(--text);
+  background: radial-gradient(circle at 0% 0%, #f0f5ff 0%, var(--bg) 55%, #e9f2ff 100%);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100svh;
+}
+
+#root {
+  min-height: 100svh;
+}
+
+h1,
+h2 {
+  font-family: var(--heading);
+  color: var(--text);
+}
+
+h2 {
+  font-size: 1.1rem;
+  line-height: 1.2;
+}
+
+h3,
+p {
+  margin: 0;
+}
