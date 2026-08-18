@@ -42,6 +42,48 @@ npm run deploy:prod
 
 Copy `.env.example` to `.env` for local development tests only.
 
+### Quick local setup (`.env.local`)
+
+Create `Gold CRM Analytics/.env.local` with:
+
+```bash
+VITE_ZOHO_SOURCE="Zoho CRM (local)"
+
+ZOHO_CLIENT_ID=
+ZOHO_CLIENT_SECRET=
+ZOHO_REFRESH_TOKEN=
+ZOHO_ORG_ID=
+ZOHO_API_BASE=https://www.zohoapis.com/crm/v2
+```
+
+What to fill:
+- `ZOHO_CLIENT_ID`: from Zoho API Console client credentials.
+- `ZOHO_CLIENT_SECRET`: from Zoho API Console client credentials.
+- `ZOHO_REFRESH_TOKEN`: generated after OAuth authorize.
+- `ZOHO_ORG_ID`: your Zoho CRM org id.
+- `ZOHO_API_BASE`: choose your datacenter (`.com`, `.eu`, `.in`, etc.).
+
+If you leave the `ZOHO_*` fields blank, the app still runs and shows local sample cards.
+
+### Localhost not working?
+
+Use:
+
+```bash
+npm run dev
+
+# then open:
+http://localhost:5173/
+```
+
+If another app is already on 5173:
+
+```bash
+npm run dev -- --host 0.0.0.0 --port 5174
+```
+
+Then open `http://localhost:5174/`.
+
 ## API route (Vercel)
 
 A serverless function is available at:
