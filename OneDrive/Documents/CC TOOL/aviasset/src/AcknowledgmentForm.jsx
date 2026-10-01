@@ -161,12 +161,32 @@ export default function AcknowledgmentForm({
       ]);
       const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
       for (let index = 0; index < pages.length; index += 1) {
+        const pageRect = pages[index].getBoundingClientRect();
+        const employeeSignature = pages[index].querySelector(".employee-signature-field");
+        const employeeDate = pages[index].querySelector(".employee-date-field");
+        if (employeeDate) employeeDate.textContent = "";
         const canvas = await html2canvas(pages[index], { scale: 2, useCORS: true, backgroundColor: "#ffffff", windowWidth: pages[index].scrollWidth, windowHeight: pages[index].scrollHeight });
         if (index > 0) pdf.addPage("a4", "portrait");
         const scale = Math.min(210 / canvas.width, 297 / canvas.height);
         const width = canvas.width * scale;
         const height = canvas.height * scale;
-        pdf.addImage(canvas.toDataURL("image/jpeg", 0.96), "JPEG", (210 - width) / 2, 0, width, height);
+        const offsetX = (210 - width) / 2;
+        pdf.addImage(canvas.toDataURL("image/jpeg", 0.96), "JPEG", offsetX, 0, width, height);
+        if (pdf.AcroFormTextField && (employeeSignature || employeeDate)) {
+          const mmPerPixel = width / pageRect.width;
+          const addField = (element, name, value = "") => {
+            if (!element) return;
+            const rect = element.getBoundingClientRect();
+            const field = new pdf.AcroFormTextField();
+            field.fieldName = name;
+            field.Rect = [offsetX + (rect.left - pageRect.left) * mmPerPixel, (rect.top - pageRect.top) * mmPerPixel, rect.width * mmPerPixel, Math.max(7, rect.height * mmPerPixel)];
+            field.value = value;
+            field.fontSize = 10;
+            pdf.addField(field);
+          };
+          addField(employeeSignature, `employee_signature_${person.id}`);
+          addField(employeeDate, `employee_signature_date_${person.id}`, today);
+        }
       }
       const filename = `${person.name}-asset-acknowledgment.pdf`.replace(/[^a-z0-9.-]+/gi, "-").toLowerCase();
       pdf.save(filename);
@@ -361,10 +381,10 @@ export default function AcknowledgmentForm({
           <div className="signature-grid">
             <label>
               Employee Signature
-              <div />
+              <div className="employee-signature-field" />
             </label>
             <label>
-              Date<div>{today}</div>
+              Date<div className="employee-date-field">{today}</div>
             </label>
             <label>
               Issued By Name
