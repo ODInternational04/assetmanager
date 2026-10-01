@@ -40,6 +40,15 @@ create table if not exists public.assignment_history (
   notes text
 );
 
+alter table public.assets drop constraint if exists assets_status_check;
+alter table public.assets add constraint assets_status_check
+  check (status in ('Assigned', 'In stock', 'Returned', 'Repair', 'Retired', 'Junk'));
+
+alter table public.assignment_history drop constraint if exists assignment_history_action_check;
+alter table public.assignment_history alter column person_id drop not null;
+alter table public.assignment_history add constraint assignment_history_action_check
+  check (action in ('Assigned', 'Returned', 'Transferred', 'Junked'));
+
 create table if not exists public.acknowledgments (
   id uuid primary key default gen_random_uuid(),
   asset_id uuid not null references public.assets(id) on delete cascade,
@@ -54,6 +63,11 @@ create table if not exists public.acknowledgments (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.acknowledgments alter column asset_id drop not null;
+alter table public.acknowledgments add column if not exists person_id uuid references public.people(id) on delete cascade;
+alter table public.acknowledgments add column if not exists title text;
+create index if not exists acknowledgments_person_id_idx on public.acknowledgments(person_id);
 
 alter table public.assets enable row level security;
 alter table public.people enable row level security;
