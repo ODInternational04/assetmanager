@@ -206,8 +206,13 @@ export default function AcknowledgmentForm({
           const pdfDocument = await PDFDocument.load(pdf.output("arraybuffer"));
           const page = pdfDocument.getPages()[1];
           const [x, yFromTop, width, height] = employeeSignatureRect;
-          const y = 297 - yFromTop - height;
-          const signatureWidget = pdfDocument.context.obj({ Type: "Annot", Subtype: "Widget", FT: "Sig", T: PDFHexString.fromText(`employee_signature_${person.id}`), Rect: [x, y, x + width, y + height], F: 4, P: page.ref, BS: { W: 1, S: "S" } });
+          const xScale = page.getWidth() / 210;
+          const yScale = page.getHeight() / 297;
+          const xPt = x * xScale;
+          const yPt = (297 - yFromTop - height) * yScale;
+          const widthPt = width * xScale;
+          const heightPt = height * yScale;
+          const signatureWidget = pdfDocument.context.obj({ Type: "Annot", Subtype: "Widget", FT: "Sig", T: PDFHexString.fromText(`employee_signature_${person.id}`), TU: PDFHexString.fromText("Employee Signature - click to sign"), Rect: [xPt, yPt, xPt + widthPt, yPt + heightPt], F: 4, P: page.ref, BS: { W: 1, S: "S" }, MK: { BC: [0.55, 0.65, 0.75], BG: [0.94, 0.97, 1] } });
           const signatureRef = pdfDocument.context.register(signatureWidget);
           page.node.addAnnot(signatureRef);
           const form = pdfDocument.getForm();
