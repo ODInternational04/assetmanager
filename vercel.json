@@ -1,9 +1,9 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "version": 2,
-  "installCommand": "npm --prefix \"OneDrive/Documents/CC TOOL/aviasset\" install",
-  "buildCommand": "npm --prefix \"OneDrive/Documents/CC TOOL/aviasset\" run build",
-  "outputDirectory": "OneDrive/Documents/CC TOOL/aviasset/dist",
+  "installCommand": "npm install",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
   "framework": "vite",
   "github": {
     "silent": true
