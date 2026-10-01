@@ -77,11 +77,11 @@ export default function AcknowledgmentForm({
 }) {
   const [signature, setSignature] = useState("");
   const [signedFile, setSignedFile] = useState("");
+  const [savingPdf, setSavingPdf] = useState(false);
   const today = new Date().toLocaleDateString("en-ZA");
-  function printForm() {
-    if (!signature) return;
+  function buildPages() {
     const source = document.querySelector(".ack-document")?.cloneNode(true);
-    if (!source) return;
+    if (!source) return null;
     source
       .querySelectorAll("input")
       .forEach((input) => input.setAttribute("value", input.value));
@@ -110,6 +110,13 @@ export default function AcknowledgmentForm({
         node = next;
       }
     } else pageOne.append(...source.childNodes);
+    return [pageOne, pageTwo];
+  }
+  function printForm() {
+    if (!signature) return;
+    const pages = buildPages();
+    if (!pages) return;
+    const [pageOne, pageTwo] = pages;
     const popup = window.open("", "_blank", "width=900,height=1100");
     if (!popup) {
       window.print();
@@ -121,6 +128,37 @@ export default function AcknowledgmentForm({
     popup.document.close();
     popup.focus();
     setTimeout(() => popup.print(), 250);
+  }
+  async function savePdf() {
+    if (!signature || savingPdf) return;
+    const pages = buildPages();
+    if (!pages) return;
+    setSavingPdf(true);
+    const stage = document.createElement("div");
+    stage.style.cssText = "position:fixed;left:-10000px;top:0;background:#fff;z-index:-1";
+    pages.forEach((page) => {
+      page.style.cssText = "width:794px;min-height:1123px;margin:0;padding:70px 80px;box-shadow:none;background:#fff";
+      stage.appendChild(page);
+    });
+    document.body.appendChild(stage);
+    try {
+      await document.fonts?.ready;
+      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
+        import("html2canvas"),
+        import("jspdf"),
+      ]);
+      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+      for (let index = 0; index < pages.length; index += 1) {
+        const canvas = await html2canvas(pages[index], { scale: 2, useCORS: true, backgroundColor: "#ffffff" });
+        if (index > 0) pdf.addPage("a4", "portrait");
+        pdf.addImage(canvas.toDataURL("image/jpeg", 0.96), "JPEG", 0, 0, 210, 297);
+      }
+      const filename = `${person.name}-asset-acknowledgment.pdf`.replace(/[^a-z0-9.-]+/gi, "-").toLowerCase();
+      pdf.save(filename);
+    } finally {
+      stage.remove();
+      setSavingPdf(false);
+    }
   }
   async function uploadSigned(event) {
     const file = event.target.files?.[0];
@@ -361,14 +399,8 @@ export default function AcknowledgmentForm({
               onChange={uploadSigned}
             />
           </label>
-          <button
-            type="button"
-            className="primary"
-            disabled={!signature}
-            onClick={printForm}
-          >
-            Print / Save as PDF
-          </button>
+          <button type="button" className="secondary ack-print-button" disabled={!signature} onClick={printForm}>Print</button>
+          <button type="button" className="primary" disabled={!signature || savingPdf} onClick={savePdf}>{savingPdf ? "Creating PDF..." : "Save PDF"}</button>
         </div>
       </div>
     </div>
