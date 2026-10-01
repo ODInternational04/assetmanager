@@ -320,10 +320,10 @@ export default function AcknowledgmentForm({
             <label>
               Date<div>{today}</div>
             </label>
-            <label className="issuer-signature-label">
-              Issued By Signature
+            <div className="issuer-signature-label">
+              <span>Issued By Signature</span>
               <SignaturePad value={signature} onChange={setSignature} />
-            </label>
+            </div>
             <label>
               Date<div>{today}</div>
             </label>
