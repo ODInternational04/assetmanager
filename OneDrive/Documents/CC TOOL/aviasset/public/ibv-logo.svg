@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 450" role="img" aria-labelledby="title">
+  <title id="title">IBV International Vaults</title>
+  <g fill="#1e5662">
+    <path d="M245 45h55v74h-55zM245 137h55v170h-55zM321 45c54 0 110 6 141 34l-26 38c-18-15-40-21-62-21h-1v45h23c55 0 92 27 92 78 0 57-40 88-112 88h-55V45zm52 192v26h18c34 0 51-9 51-27 0-17-17-25-51-25h-18v26zm130-192h63l43 141 46-141h64l-91 262h-59L503 45z"/>
+  </g>
+  <path fill="#d3b46c" d="M317 42c28 30 34 61 27 94-7 35-30 67-57 94l-28 28v-48c31-39 53-72 58-105 5-28 1-48-12-63z"/>
+  <g fill="#1e5662" font-family="Arial, sans-serif" text-anchor="middle">
+    <text x="450" y="360" font-size="48" letter-spacing="2">IBV INTERNATIONAL</text>
+    <text x="450" y="407" font-size="45" letter-spacing="4">VAULTS</text>
+  </g>
+</svg>
