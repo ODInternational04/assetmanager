@@ -20,6 +20,26 @@ create table if not exists public.assets (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists public.people (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  employee_number text unique,
+  department text,
+  position text,
+  email text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.assignment_history (
+  id uuid primary key default gen_random_uuid(),
+  asset_id uuid not null references public.assets(id) on delete cascade,
+  person_id uuid not null references public.people(id) on delete cascade,
+  action text not null check (action in ('Assigned', 'Returned', 'Transferred')),
+  assigned_at timestamptz not null default now(),
+  notes text
+);
+
 create table if not exists public.acknowledgments (
   id uuid primary key default gen_random_uuid(),
   asset_id uuid not null references public.assets(id) on delete cascade,
@@ -36,9 +56,17 @@ create table if not exists public.acknowledgments (
 );
 
 alter table public.assets enable row level security;
+alter table public.people enable row level security;
+alter table public.assignment_history enable row level security;
 alter table public.acknowledgments enable row level security;
 
 create policy "Authenticated users can manage assets" on public.assets
+  for all to authenticated using (true) with check (true);
+
+create policy "Authenticated users can manage people" on public.people
+  for all to authenticated using (true) with check (true);
+
+create policy "Authenticated users can manage assignment history" on public.assignment_history
   for all to authenticated using (true) with check (true);
 
 create policy "Authenticated users can manage acknowledgments" on public.acknowledgments
