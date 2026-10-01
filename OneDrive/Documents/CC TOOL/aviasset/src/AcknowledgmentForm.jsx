@@ -110,6 +110,15 @@ export default function AcknowledgmentForm({
         node = next;
       }
     } else pageOne.append(...source.childNodes);
+    [pageOne, pageTwo].forEach((page) => {
+      page.style.display = "flex";
+      page.style.flexDirection = "column";
+      const footer = page.querySelector(".ack-footer");
+      if (footer) {
+        footer.style.marginTop = "auto";
+        footer.style.paddingTop = "24px";
+      }
+    });
     return [pageOne, pageTwo];
   }
   function printForm() {
@@ -138,7 +147,9 @@ export default function AcknowledgmentForm({
     stage.style.cssText = "position:fixed;left:-10000px;top:0;background:#fff;z-index:-1";
     pages.forEach((page) => {
       page.classList.add("pdf-page");
-      page.style.cssText = "width:794px;min-height:1123px;margin:0;padding:70px 80px;box-shadow:none;background:#fff;overflow:visible";
+      page.style.cssText = "width:794px;min-height:1123px;margin:0;padding:70px 80px;box-shadow:none;background:#fff;overflow:visible;display:flex;flex-direction:column";
+      const footer = page.querySelector(".ack-footer");
+      if (footer) footer.style.cssText = "margin-top:auto;padding-top:24px";
       stage.appendChild(page);
     });
     document.body.appendChild(stage);
