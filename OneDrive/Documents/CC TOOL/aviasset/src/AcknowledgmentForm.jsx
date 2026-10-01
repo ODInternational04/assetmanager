@@ -160,11 +160,14 @@ export default function AcknowledgmentForm({
         import("jspdf"),
       ]);
       const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+      let employeeSignatureRect = null;
       for (let index = 0; index < pages.length; index += 1) {
         const pageRect = pages[index].getBoundingClientRect();
         const employeeSignature = pages[index].querySelector(".employee-signature-field");
         const employeeDate = pages[index].querySelector(".employee-date-field");
+        const employeeName = pages[index].querySelector(".employee-name-field");
         if (employeeDate) employeeDate.textContent = "";
+        if (employeeName) employeeName.textContent = "";
         const canvas = await html2canvas(pages[index], { scale: 2, useCORS: true, backgroundColor: "#ffffff", windowWidth: pages[index].scrollWidth, windowHeight: pages[index].scrollHeight });
         if (index > 0) pdf.addPage("a4", "portrait");
         const scale = Math.min(210 / canvas.width, 297 / canvas.height);
@@ -181,15 +184,45 @@ export default function AcknowledgmentForm({
             field.fieldName = name;
             field.Rect = [offsetX + (rect.left - pageRect.left) * mmPerPixel, (rect.top - pageRect.top) * mmPerPixel, rect.width * mmPerPixel, Math.max(7, rect.height * mmPerPixel)];
             field.value = value;
+            field.defaultValue = value;
             field.fontSize = 10;
+            field.fontName = "Helvetica";
+            field.color = "#000000";
+            field.textAlign = "left";
             pdf.addField(field);
           };
-          addField(employeeSignature, `employee_signature_${person.id}`);
           addField(employeeDate, `employee_signature_date_${person.id}`, today);
+          addField(employeeName, `employee_acknowledgment_name_${person.id}`, person.name);
+          if (employeeSignature) {
+            const rect = employeeSignature.getBoundingClientRect();
+            employeeSignatureRect = [offsetX + (rect.left - pageRect.left) * mmPerPixel, (rect.top - pageRect.top) * mmPerPixel, rect.width * mmPerPixel, Math.max(9, rect.height * mmPerPixel)];
+          }
         }
       }
       const filename = `${person.name}-asset-acknowledgment.pdf`.replace(/[^a-z0-9.-]+/gi, "-").toLowerCase();
-      pdf.save(filename);
+      if (employeeSignatureRect) {
+        try {
+          const [{ PDFDocument, PDFHexString, PDFName }] = await Promise.all([import("pdf-lib")]);
+          const pdfDocument = await PDFDocument.load(pdf.output("arraybuffer"));
+          const page = pdfDocument.getPages()[1];
+          const [x, yFromTop, width, height] = employeeSignatureRect;
+          const y = 297 - yFromTop - height;
+          const signatureWidget = pdfDocument.context.obj({ Type: "Annot", Subtype: "Widget", FT: "Sig", T: PDFHexString.fromText(`employee_signature_${person.id}`), Rect: [x, y, x + width, y + height], F: 4, P: page.ref, BS: { W: 1, S: "S" } });
+          const signatureRef = pdfDocument.context.register(signatureWidget);
+          page.node.addAnnot(signatureRef);
+          const form = pdfDocument.getForm();
+          form.acroForm.addField(signatureRef);
+          form.acroForm.dict.set(PDFName.of("SigFlags"), pdfDocument.context.obj(3));
+          const bytes = await pdfDocument.save();
+          const link = document.createElement("a");
+          link.href = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
+          link.download = filename;
+          link.click();
+          setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+        } catch {
+          pdf.save(filename);
+        }
+      } else pdf.save(filename);
     } finally {
       stage.remove();
       setSavingPdf(false);
@@ -372,7 +405,7 @@ export default function AcknowledgmentForm({
           <hr />
           <h3>Acknowledgment and Acceptance</h3>
           <p className="ack-copy">
-            I, __________________________________________, acknowledge receipt
+            I, <span className="employee-name-field">{person.name}</span>, acknowledge receipt
             of the above-listed company asset(s). I understand that these items
             remain the property of <b>IBV International Vaults Pty Ltd</b> and
             agree to use and maintain them in accordance with the terms outlined
