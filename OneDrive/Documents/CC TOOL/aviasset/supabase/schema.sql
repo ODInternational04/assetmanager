@@ -60,6 +60,14 @@ alter table public.people enable row level security;
 alter table public.assignment_history enable row level security;
 alter table public.acknowledgments enable row level security;
 
+drop policy if exists "Authenticated users can manage assets" on public.assets;
+drop policy if exists "Authenticated users can manage people" on public.people;
+drop policy if exists "Authenticated users can manage assignment history" on public.assignment_history;
+drop policy if exists "Authenticated users can manage acknowledgments" on public.acknowledgments;
+drop policy if exists "Authenticated users can read acknowledgment files" on storage.objects;
+drop policy if exists "Authenticated users can upload acknowledgment files" on storage.objects;
+drop policy if exists "Authenticated users can update acknowledgment files" on storage.objects;
+
 create policy "Authenticated users can manage assets" on public.assets
   for all to authenticated using (true) with check (true);
 
