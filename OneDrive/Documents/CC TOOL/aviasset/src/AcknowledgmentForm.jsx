@@ -35,6 +35,7 @@ function SignaturePad({ value, onChange }) {
     const c = ref.current.getContext("2d");
     c.lineTo(p.x, p.y);
     c.stroke();
+    onChange(ref.current.toDataURL("image/png"));
   };
   const stop = () => {
     if (drawing.current) {
@@ -52,6 +53,7 @@ function SignaturePad({ value, onChange }) {
         onPointerMove={move}
         onPointerUp={stop}
         onPointerCancel={stop}
+        onPointerLeave={stop}
       />
       <img src={value || ""} alt="Issuer signature" />
       <button
