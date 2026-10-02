@@ -232,6 +232,9 @@ function App() {
       model: values.model,
       serial: values.serial || null,
       imei: values.imei || null,
+      purchase_date: values.purchaseDate || null,
+      purchase_value: values.purchaseValue ? Number(values.purchaseValue) : null,
+      on_contract: values.onContract === "on",
       status: "In stock",
       condition: values.condition,
     };
@@ -1009,6 +1012,8 @@ function RecordModal({ type, people, assets, locations, close, submit }) {
                 <option>Laptop</option>
                 <option>Phone</option>
                 <option>Tablet</option>
+                <option>Printer</option>
+                <option>Desktop</option>
                 <option>Other</option>
               </select>
             </label>
@@ -1036,6 +1041,18 @@ function RecordModal({ type, people, assets, locations, close, submit }) {
             <label>
               IMEI
               <input name="imei" />
+            </label>
+            <label>
+              Purchase date
+              <input type="date" name="purchaseDate" />
+            </label>
+            <label>
+              Purchase value
+              <input type="number" min="0" step="0.01" name="purchaseValue" placeholder="0.00" />
+            </label>
+            <label className="checkbox-field">
+              <input type="checkbox" name="onContract" />
+              <span>On contract</span>
             </label>
             <label>
               Condition

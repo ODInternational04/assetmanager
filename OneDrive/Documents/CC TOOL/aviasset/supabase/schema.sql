@@ -43,6 +43,9 @@ create table if not exists public.assignment_history (
 alter table public.assets drop constraint if exists assets_status_check;
 alter table public.assets add constraint assets_status_check
   check (status in ('Assigned', 'In stock', 'Returned', 'Repair', 'Retired', 'Junk'));
+alter table public.assets add column if not exists purchase_date date;
+alter table public.assets add column if not exists purchase_value numeric(12, 2);
+alter table public.assets add column if not exists on_contract boolean not null default false;
 
 alter table public.assignment_history drop constraint if exists assignment_history_action_check;
 alter table public.assignment_history alter column person_id drop not null;
