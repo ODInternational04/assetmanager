@@ -740,8 +740,8 @@ function AssetsRegister({
             ))}
           </select>
         </div>
-        <div className="table-wrap">
-          <table>
+        <div className="table-wrap asset-table-wrap">
+          <table className="asset-table">
             <thead>
               <tr>
                 <th>Asset</th>
