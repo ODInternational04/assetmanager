@@ -2,3 +2,4 @@ node_modules
 dist
 .env.local
 supabase/import-list-data.sql
+supabase/import-pdf-registers.sql
