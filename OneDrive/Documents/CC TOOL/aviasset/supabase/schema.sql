@@ -47,6 +47,27 @@ alter table public.assets add column if not exists purchase_date date;
 alter table public.assets add column if not exists purchase_value numeric(12, 2);
 alter table public.assets add column if not exists on_contract boolean not null default false;
 
+create table if not exists public.domains (
+  id uuid primary key default gen_random_uuid(),
+  domain text not null unique,
+  provider text not null,
+  transfer_date date,
+  renewal_date date,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.domain_history (
+  id uuid primary key default gen_random_uuid(),
+  domain_id uuid not null references public.domains(id) on delete cascade,
+  action text not null,
+  transfer_date date,
+  renewal_date date,
+  provider text,
+  recorded_at timestamptz not null default now(),
+  notes text
+);
+
 alter table public.assignment_history drop constraint if exists assignment_history_action_check;
 alter table public.assignment_history alter column person_id drop not null;
 alter table public.assignment_history add constraint assignment_history_action_check
@@ -76,11 +97,15 @@ alter table public.assets enable row level security;
 alter table public.people enable row level security;
 alter table public.assignment_history enable row level security;
 alter table public.acknowledgments enable row level security;
+alter table public.domains enable row level security;
+alter table public.domain_history enable row level security;
 
 drop policy if exists "Authenticated users can manage assets" on public.assets;
 drop policy if exists "Authenticated users can manage people" on public.people;
 drop policy if exists "Authenticated users can manage assignment history" on public.assignment_history;
 drop policy if exists "Authenticated users can manage acknowledgments" on public.acknowledgments;
+drop policy if exists "Authenticated users can manage domains" on public.domains;
+drop policy if exists "Authenticated users can manage domain history" on public.domain_history;
 drop policy if exists "Authenticated users can read acknowledgment files" on storage.objects;
 drop policy if exists "Authenticated users can upload acknowledgment files" on storage.objects;
 drop policy if exists "Authenticated users can update acknowledgment files" on storage.objects;
@@ -95,6 +120,12 @@ create policy "Authenticated users can manage assignment history" on public.assi
   for all to authenticated using (true) with check (true);
 
 create policy "Authenticated users can manage acknowledgments" on public.acknowledgments
+  for all to authenticated using (true) with check (true);
+
+create policy "Authenticated users can manage domains" on public.domains
+  for all to authenticated using (true) with check (true);
+
+create policy "Authenticated users can manage domain history" on public.domain_history
   for all to authenticated using (true) with check (true);
 
 insert into storage.buckets (id, name, public)
