@@ -1214,8 +1214,8 @@ function RecordModal({ type, record, people, assets, locations, close, submit })
           <div className="form-grid">
             {isEditing && (
               <>
-                <input type="hidden" name="recordId" value={record.id} readOnly />
-                <input type="hidden" name="currentName" value={record.name} readOnly />
+                <input type="hidden" name="recordId" value={record?.id || ""} readOnly />
+                <input type="hidden" name="currentName" value={record?.name || ""} readOnly />
               </>
             )}
             <label>
@@ -1262,9 +1262,9 @@ function RecordModal({ type, record, people, assets, locations, close, submit })
           <div className="form-grid">
             {isEditing && (
               <>
-                <input type="hidden" name="recordId" value={record.supabaseId || record.id} readOnly />
-                <input type="hidden" name="currentStatus" value={record.status || "In stock"} readOnly />
-                <input type="hidden" name="currentAssignee" value={record.assignee || "Unassigned"} readOnly />
+                <input type="hidden" name="recordId" value={record?.supabaseId || record?.id || ""} readOnly />
+                <input type="hidden" name="currentStatus" value={record?.status || "In stock"} readOnly />
+                <input type="hidden" name="currentAssignee" value={record?.assignee || "Unassigned"} readOnly />
               </>
             )}
             <label>
