@@ -107,6 +107,7 @@ function App() {
   const [statusFilter, setStatusFilter] = useState("All");
   const [locationFilter, setLocationFilter] = useState("All");
   const [modal, setModal] = useState(null);
+  const [editRecord, setEditRecord] = useState(null);
   const [detail, setDetail] = useState(null);
   const [ack, setAck] = useState(null);
 
@@ -205,6 +206,56 @@ function App() {
       position: values.position || null,
       email: values.email || null,
     };
+    if (values.recordId) {
+      if (supabase) {
+        const { data, error } = await supabase
+          .from("people")
+          .update(payload)
+          .eq("id", values.recordId)
+          .select()
+          .single();
+        if (error) return window.alert(error.message);
+        if (data)
+          setPeople((all) =>
+            all.map((person) =>
+              person.id === data.id
+                ? { ...data, employeeNumber: data.employee_number }
+                : person,
+            ),
+          );
+        if (data && values.currentName && values.currentName !== data.name) {
+          setAssets((all) =>
+            all.map((asset) =>
+              asset.assignee === values.currentName
+                ? { ...asset, assignee: data.name }
+                : asset,
+            ),
+          );
+          await supabase
+            .from("assets")
+            .update({ assignee: data.name })
+            .eq("assignee", values.currentName);
+        }
+      } else {
+        setPeople((all) =>
+          all.map((person) =>
+            person.id === values.recordId
+              ? { ...person, ...values, employeeNumber: values.employeeNumber }
+              : person,
+          ),
+        );
+        setAssets((all) =>
+          all.map((asset) =>
+            asset.assignee === values.currentName
+              ? { ...asset, assignee: values.name }
+              : asset,
+          ),
+        );
+      }
+      setModal(null);
+      setEditRecord(null);
+      return;
+    }
     if (supabase) {
       const { data } = await supabase
         .from("people")
@@ -238,6 +289,38 @@ function App() {
       status: "In stock",
       condition: values.condition,
     };
+    if (values.recordId) {
+      const updatePayload = { ...payload };
+      delete updatePayload.asset_code;
+      if (supabase) {
+        const { data, error } = await supabase
+          .from("assets")
+          .update(updatePayload)
+          .eq("id", values.recordId)
+          .select()
+          .single();
+        if (error) return window.alert(error.message);
+        if (data)
+          setAssets((all) =>
+            all.map((asset) =>
+              asset.supabaseId === data.id
+                ? { ...data, id: data.asset_code, supabaseId: data.id, assignee: data.assignee || "Unassigned" }
+                : asset,
+            ),
+          );
+      } else {
+        setAssets((all) =>
+          all.map((asset) =>
+            asset.id === values.recordId
+              ? { ...asset, ...payload, id: asset.id, assignee: values.currentAssignee || asset.assignee }
+              : asset,
+          ),
+        );
+      }
+      setModal(null);
+      setEditRecord(null);
+      return;
+    }
     if (supabase) {
       const { data } = await supabase
         .from("assets")
@@ -448,6 +531,10 @@ function App() {
             openDetail={(person) =>
               setDetail({ type: "person", value: person })
             }
+            openEdit={(person) => {
+              setEditRecord(person);
+              setModal("editPerson");
+            }}
           />
         )}
         {tab === "Assets" && (
@@ -465,6 +552,10 @@ function App() {
             setLocation={setLocationFilter}
             setModal={setModal}
             openDetail={(asset) => setDetail({ type: "asset", value: asset })}
+            openEdit={(asset) => {
+              setEditRecord(asset);
+              setModal("editAsset");
+            }}
             markJunk={markJunk}
           />
         )}
@@ -473,14 +564,18 @@ function App() {
       {modal && (
         <RecordModal
           type={modal}
+          record={editRecord}
           people={people}
           assets={assets}
           locations={locations}
-          close={() => setModal(null)}
+          close={() => {
+            setModal(null);
+            setEditRecord(null);
+          }}
           submit={
-            modal === "person"
+            modal === "person" || modal === "editPerson"
               ? savePerson
-              : modal === "asset"
+              : modal === "asset" || modal === "editAsset"
                 ? saveAsset
                 : assignAsset
           }
@@ -576,6 +671,7 @@ function PeopleRegister({
   setModal,
   openAck,
   openDetail,
+  openEdit,
 }) {
   return (
     <section className="register">
@@ -653,6 +749,9 @@ function PeopleRegister({
                     >
                       View details
                     </button>
+                    <button className="row-action" onClick={() => openEdit(person)}>
+                      Edit
+                    </button>
                   </td>
                 </tr>
               );
@@ -677,6 +776,7 @@ function AssetsRegister({
   setLocation,
   setModal,
   openDetail,
+  openEdit,
   markJunk,
 }) {
   const sections = [
@@ -792,6 +892,9 @@ function AssetsRegister({
                       onClick={() => openDetail(asset)}
                     >
                       History
+                    </button>
+                    <button className="row-action" onClick={() => openEdit(asset)}>
+                      Edit
                     </button>
                     <button
                       className="row-action danger-row"
@@ -960,7 +1063,9 @@ function DetailPanel({ detail, assets, history, documents, close, viewPdf }) {
     </div>
   );
 }
-function RecordModal({ type, people, assets, locations, close, submit }) {
+function RecordModal({ type, record, people, assets, locations, close, submit }) {
+  const isPersonEdit = type === "editPerson";
+  const isAssetEdit = type === "editAsset";
   return (
     <div className="modal-backdrop" onClick={close}>
       <form
@@ -972,43 +1077,60 @@ function RecordModal({ type, people, assets, locations, close, submit }) {
           x
         </button>
         <span className="detail-label">
-          {type === "assign" ? "Assignment" : "New record"}
+          {type === "assign" ? "Assignment" : type === "editPerson" || type === "editAsset" ? "Edit record" : "New record"}
         </span>
         <h2>
           {type === "assign"
             ? "Assign asset"
             : type === "person"
               ? "Add person"
-              : "Add asset"}
+              : isPersonEdit
+                ? "Edit person"
+                : isAssetEdit
+                  ? "Edit asset"
+                  : "Add asset"}
         </h2>
-        {type === "person" ? (
+        {type === "person" || isPersonEdit ? (
           <div className="form-grid">
+            {isPersonEdit && (
+              <>
+                <input type="hidden" name="recordId" value={record?.id || ""} readOnly />
+                <input type="hidden" name="currentName" value={record?.name || ""} readOnly />
+              </>
+            )}
             <label>
               Name
-              <input required name="name" />
+              <input required name="name" defaultValue={record?.name || ""} />
             </label>
             <label>
               Employee number
-              <input name="employeeNumber" />
+              <input name="employeeNumber" defaultValue={record?.employeeNumber || record?.employee_number || ""} />
             </label>
             <label>
               Department
-              <input name="department" />
+              <input name="department" defaultValue={record?.department || ""} />
             </label>
             <label>
               Position
-              <input name="position" />
+              <input name="position" defaultValue={record?.position || ""} />
             </label>
             <label>
               Email
-              <input type="email" name="email" />
+              <input type="email" name="email" defaultValue={record?.email || ""} />
             </label>
           </div>
-        ) : type === "asset" ? (
+        ) : type === "asset" || isAssetEdit ? (
           <div className="form-grid">
+            {isAssetEdit && (
+              <>
+                <input type="hidden" name="recordId" value={record?.supabaseId || record?.id || ""} readOnly />
+                <input type="hidden" name="currentStatus" value={record?.status || "In stock"} readOnly />
+                <input type="hidden" name="currentAssignee" value={record?.assignee || "Unassigned"} readOnly />
+              </>
+            )}
             <label>
               Category
-              <select name="category">
+              <select name="category" defaultValue={record?.category || "Laptop"}>
                 <option>Laptop</option>
                 <option>Phone</option>
                 <option>Tablet</option>
@@ -1019,7 +1141,7 @@ function RecordModal({ type, people, assets, locations, close, submit }) {
             </label>
             <label>
               Location
-              <input name="site" list="locations" required />
+              <input name="site" list="locations" required defaultValue={record?.site || ""} />
               <datalist id="locations">
                 {locations.map((item) => (
                   <option key={item}>{item}</option>
@@ -1028,35 +1150,35 @@ function RecordModal({ type, people, assets, locations, close, submit }) {
             </label>
             <label>
               Make
-              <input required name="make" />
+              <input required name="make" defaultValue={record?.make || ""} />
             </label>
             <label>
               Model
-              <input required name="model" />
+              <input required name="model" defaultValue={record?.model || ""} />
             </label>
             <label>
               Serial number
-              <input name="serial" />
+              <input name="serial" defaultValue={record?.serial || ""} />
             </label>
             <label>
               IMEI
-              <input name="imei" />
+              <input name="imei" defaultValue={record?.imei || ""} />
             </label>
             <label>
               Purchase date
-              <input type="date" name="purchaseDate" />
+              <input type="date" name="purchaseDate" defaultValue={record?.purchase_date || ""} />
             </label>
             <label>
               Purchase value
-              <input type="number" min="0" step="0.01" name="purchaseValue" placeholder="0.00" />
+              <input type="number" min="0" step="0.01" name="purchaseValue" placeholder="0.00" defaultValue={record?.purchase_value ?? ""} />
             </label>
             <label className="checkbox-field">
-              <input type="checkbox" name="onContract" />
+              <input type="checkbox" name="onContract" defaultChecked={Boolean(record?.on_contract)} />
               <span>On contract</span>
             </label>
             <label>
               Condition
-              <select name="condition">
+              <select name="condition" defaultValue={record?.condition || "Good"}>
                 <option>New</option>
                 <option>Good</option>
                 <option>Used</option>
