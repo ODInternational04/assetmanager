@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "./lib/supabase";
 
-function SignaturePad({ value, onChange }) {
+function SignaturePad({ value, onChange, label = "Signature" }) {
   const ref = useRef(null);
   const drawing = useRef(false);
   useEffect(() => {
@@ -44,7 +44,7 @@ function SignaturePad({ value, onChange }) {
     }
   };
   return (
-    <div className="signature-pad">
+    <div className="signature-pad" data-signature={value || ""}>
       <canvas
         ref={ref}
         width="620"
@@ -55,7 +55,7 @@ function SignaturePad({ value, onChange }) {
         onPointerCancel={stop}
         onPointerLeave={stop}
       />
-      <img src={value || ""} alt="Issuer signature" />
+      <img src={value || ""} alt={label} />
       <button
         type="button"
         onClick={() => {
@@ -76,6 +76,7 @@ export default function AcknowledgmentForm({
   onUpload,
 }) {
   const [signature, setSignature] = useState("");
+  const [employeeSignature, setEmployeeSignature] = useState("");
   const [signedFile, setSignedFile] = useState("");
   const [savingPdf, setSavingPdf] = useState(false);
   const today = new Date().toLocaleDateString("en-ZA");
@@ -87,7 +88,7 @@ export default function AcknowledgmentForm({
       .forEach((input) => input.setAttribute("value", input.value));
     source.querySelectorAll(".signature-pad").forEach((pad) => {
       const image = document.createElement("img");
-      image.src = signature;
+      image.src = pad.dataset.signature || "";
       image.className = "printed-signature";
       pad.replaceChildren(image);
     });
@@ -122,7 +123,7 @@ export default function AcknowledgmentForm({
     return [pageOne, pageTwo];
   }
   function printForm() {
-    if (!signature) return;
+    if (!signature || !employeeSignature) return;
     const pages = buildPages();
     if (!pages) return;
     const [pageOne, pageTwo] = pages;
@@ -139,7 +140,7 @@ export default function AcknowledgmentForm({
     setTimeout(() => popup.print(), 250);
   }
   async function savePdf() {
-    if (!signature || savingPdf) return;
+    if (!signature || !employeeSignature || savingPdf) return;
     const pages = buildPages();
     if (!pages) return;
     setSavingPdf(true);
@@ -160,74 +161,17 @@ export default function AcknowledgmentForm({
         import("jspdf"),
       ]);
       const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-      let employeeSignatureRect = null;
-      for (let index = 0; index < pages.length; index += 1) {
-        const pageRect = pages[index].getBoundingClientRect();
-        const employeeSignature = pages[index].querySelector(".employee-signature-field");
-        const employeeDate = pages[index].querySelector(".employee-date-field");
-        const employeeName = pages[index].querySelector(".employee-name-field");
-        if (employeeDate) employeeDate.textContent = "";
-        if (employeeName) employeeName.textContent = "";
-        const canvas = await html2canvas(pages[index], { scale: 2, useCORS: true, backgroundColor: "#ffffff", windowWidth: pages[index].scrollWidth, windowHeight: pages[index].scrollHeight });
+       for (let index = 0; index < pages.length; index += 1) {
+         const canvas = await html2canvas(pages[index], { scale: 2, useCORS: true, backgroundColor: "#ffffff", windowWidth: pages[index].scrollWidth, windowHeight: pages[index].scrollHeight });
         if (index > 0) pdf.addPage("a4", "portrait");
         const scale = Math.min(210 / canvas.width, 297 / canvas.height);
         const width = canvas.width * scale;
         const height = canvas.height * scale;
-        const offsetX = (210 - width) / 2;
-        pdf.addImage(canvas.toDataURL("image/jpeg", 0.96), "JPEG", offsetX, 0, width, height);
-        if (pdf.AcroFormTextField && (employeeSignature || employeeDate)) {
-          const mmPerPixel = width / pageRect.width;
-          const addField = (element, name, value = "") => {
-            if (!element) return;
-            const rect = element.getBoundingClientRect();
-            const field = new pdf.AcroFormTextField();
-            field.fieldName = name;
-            field.Rect = [offsetX + (rect.left - pageRect.left) * mmPerPixel, (rect.top - pageRect.top) * mmPerPixel, rect.width * mmPerPixel, Math.max(7, rect.height * mmPerPixel)];
-            field.value = value;
-            field.defaultValue = value;
-            field.fontSize = 10;
-            field.fontName = "Helvetica";
-            field.color = "#000000";
-            field.textAlign = "left";
-            pdf.addField(field);
-          };
-          addField(employeeDate, `employee_signature_date_${person.id}`, today);
-          addField(employeeName, `employee_acknowledgment_name_${person.id}`, person.name);
-          if (employeeSignature) {
-            const rect = employeeSignature.getBoundingClientRect();
-            employeeSignatureRect = [offsetX + (rect.left - pageRect.left) * mmPerPixel, (rect.top - pageRect.top) * mmPerPixel, rect.width * mmPerPixel, Math.max(9, rect.height * mmPerPixel)];
-          }
-        }
-      }
-      const filename = `${person.name}-asset-acknowledgment.pdf`.replace(/[^a-z0-9.-]+/gi, "-").toLowerCase();
-      if (employeeSignatureRect) {
-        try {
-          const [{ PDFDocument, PDFHexString, PDFName }] = await Promise.all([import("pdf-lib")]);
-          const pdfDocument = await PDFDocument.load(pdf.output("arraybuffer"));
-          const page = pdfDocument.getPages()[1];
-          const [x, yFromTop, width, height] = employeeSignatureRect;
-          const xScale = page.getWidth() / 210;
-          const yScale = page.getHeight() / 297;
-          const xPt = x * xScale;
-          const yPt = (297 - yFromTop - height) * yScale;
-          const widthPt = width * xScale;
-          const heightPt = height * yScale;
-          const signatureWidget = pdfDocument.context.obj({ Type: "Annot", Subtype: "Widget", FT: "Sig", T: PDFHexString.fromText(`employee_signature_${person.id}`), TU: PDFHexString.fromText("Employee Signature - click to sign"), Rect: [xPt, yPt, xPt + widthPt, yPt + heightPt], F: 4, P: page.ref, BS: { W: 1, S: "S" }, MK: { BC: [0.55, 0.65, 0.75], BG: [0.94, 0.97, 1] } });
-          const signatureRef = pdfDocument.context.register(signatureWidget);
-          page.node.addAnnot(signatureRef);
-          const form = pdfDocument.getForm();
-          form.acroForm.addField(signatureRef);
-          form.acroForm.dict.set(PDFName.of("SigFlags"), pdfDocument.context.obj(3));
-          const bytes = await pdfDocument.save();
-          const link = document.createElement("a");
-          link.href = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
-          link.download = filename;
-          link.click();
-          setTimeout(() => URL.revokeObjectURL(link.href), 1000);
-        } catch {
-          pdf.save(filename);
-        }
-      } else pdf.save(filename);
+         const offsetX = (210 - width) / 2;
+         pdf.addImage(canvas.toDataURL("image/jpeg", 0.96), "JPEG", offsetX, 0, width, height);
+       }
+       const filename = `${person.name}-asset-acknowledgment.pdf`.replace(/[^a-z0-9.-]+/gi, "-").toLowerCase();
+       pdf.save(filename);
     } finally {
       stage.remove();
       setSavingPdf(false);
@@ -419,7 +363,11 @@ export default function AcknowledgmentForm({
           <div className="signature-grid">
             <label>
               Employee Signature
-              <div className="employee-signature-field" />
+              <SignaturePad
+                label="Employee signature"
+                value={employeeSignature}
+                onChange={setEmployeeSignature}
+              />
             </label>
             <label>
               Date<div className="employee-date-field">{today}</div>
@@ -431,9 +379,13 @@ export default function AcknowledgmentForm({
             <label>
               Date<div>{today}</div>
             </label>
-            <div className="issuer-signature-label">
-              <span>Issued By Signature</span>
-              <SignaturePad value={signature} onChange={setSignature} />
+              <div className="issuer-signature-label">
+               <span>Issued By Signature</span>
+               <SignaturePad
+                 label="Issuer signature"
+                 value={signature}
+                 onChange={setSignature}
+               />
             </div>
             <label>
               Date<div>{today}</div>
@@ -460,9 +412,9 @@ export default function AcknowledgmentForm({
           <small>
             {signedFile
               ? `Signed PDF: ${signedFile}`
-              : signature
-                ? "Issuer signature captured. Save this PDF and send it."
-                : "Sign as issuer before saving."}
+               : signature && employeeSignature
+                 ? "Both signatures captured. Save this PDF and send it."
+                 : "Both the employee and issuer must draw their signatures before saving."}
           </small>
           <label className="upload-button">
             {signedFile ? "Replace signed PDF" : "Upload returned signed PDF"}
