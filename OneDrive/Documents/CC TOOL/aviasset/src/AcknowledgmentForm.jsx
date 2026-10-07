@@ -76,7 +76,6 @@ export default function AcknowledgmentForm({
   onUpload,
 }) {
   const [signature, setSignature] = useState("");
-  const [employeeSignature, setEmployeeSignature] = useState("");
   const [signedFile, setSignedFile] = useState("");
   const [savingPdf, setSavingPdf] = useState(false);
   const today = new Date().toLocaleDateString("en-ZA");
@@ -123,7 +122,7 @@ export default function AcknowledgmentForm({
     return [pageOne, pageTwo];
   }
   function printForm() {
-    if (!signature || !employeeSignature) return;
+    if (!signature) return;
     const pages = buildPages();
     if (!pages) return;
     const [pageOne, pageTwo] = pages;
@@ -140,7 +139,7 @@ export default function AcknowledgmentForm({
     setTimeout(() => popup.print(), 250);
   }
   async function savePdf() {
-    if (!signature || !employeeSignature || savingPdf) return;
+    if (!signature || savingPdf) return;
     const pages = buildPages();
     if (!pages) return;
     setSavingPdf(true);
@@ -363,11 +362,7 @@ export default function AcknowledgmentForm({
           <div className="signature-grid">
             <label>
               Employee Signature
-              <SignaturePad
-                label="Employee signature"
-                value={employeeSignature}
-                onChange={setEmployeeSignature}
-              />
+              <div className="employee-signature-field" />
             </label>
             <label>
               Date<div className="employee-date-field">{today}</div>
@@ -412,9 +407,9 @@ export default function AcknowledgmentForm({
           <small>
             {signedFile
               ? `Signed PDF: ${signedFile}`
-               : signature && employeeSignature
-                 ? "Both signatures captured. Save this PDF and send it."
-                 : "Both the employee and issuer must draw their signatures before saving."}
+               : signature
+                 ? "Issuer signature captured. Save this PDF and send it for employee signature."
+                 : "Sign as issuer before saving."}
           </small>
           <label className="upload-button">
             {signedFile ? "Replace signed PDF" : "Upload returned signed PDF"}
