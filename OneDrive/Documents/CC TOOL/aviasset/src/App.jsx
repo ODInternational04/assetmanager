@@ -99,8 +99,6 @@ function App() {
   const [tab, setTab] = useState("People");
   const [people, setPeople] = useState(seedPeople);
   const [assets, setAssets] = useState(seedAssets);
-  const [domains, setDomains] = useState([]);
-  const [domainHistory, setDomainHistory] = useState([]);
   const [history, setHistory] = useState([]);
   const [documents, setDocuments] = useState([]);
   const [query, setQuery] = useState("");
@@ -139,12 +137,7 @@ function App() {
         .from("acknowledgments")
         .select("*")
         .order("created_at", { ascending: false }),
-      supabase.from("domains").select("*").order("domain"),
-      supabase
-        .from("domain_history")
-        .select("*, domain:domains(domain)")
-        .order("recorded_at", { ascending: false }),
-    ]).then(([peopleResult, assetResult, historyResult, documentResult, domainsResult, domainHistoryResult]) => {
+    ]).then(([peopleResult, assetResult, historyResult, documentResult]) => {
       if (peopleResult.data?.length)
         setPeople(
           peopleResult.data.map((person) => ({
@@ -170,14 +163,6 @@ function App() {
           })),
         );
       if (documentResult.data) setDocuments(documentResult.data);
-      if (domainsResult.data) setDomains(domainsResult.data);
-      if (domainHistoryResult.data)
-        setDomainHistory(
-          domainHistoryResult.data.map((entry) => ({
-            ...entry,
-            domain_name: entry.domain?.domain,
-          })),
-        );
     });
   }, [session]);
 
@@ -209,9 +194,6 @@ function App() {
         .toLowerCase()
         .includes(query.toLowerCase()),
     );
-  const domainsShown = domains.filter((item) =>
-    `${item.domain} ${item.provider}`.toLowerCase().includes(query.toLowerCase()),
-  );
 
   async function savePerson(event) {
     event.preventDefault();
@@ -277,48 +259,6 @@ function App() {
         { ...payload, id: code, assignee: "Unassigned" },
         ...all,
       ]);
-    setModal(null);
-  }
-  async function saveDomain(event) {
-    event.preventDefault();
-    const values = Object.fromEntries(new FormData(event.currentTarget));
-    const payload = {
-      domain: values.domain.trim().toLowerCase(),
-      provider: values.provider.trim(),
-      transfer_date: values.transferDate || null,
-      renewal_date: values.renewalDate || null,
-    };
-    if (supabase) {
-      const { data, error } = await supabase
-        .from("domains")
-        .insert(payload)
-        .select()
-        .single();
-      if (error) {
-        window.alert(error.message);
-        return;
-      }
-      if (data) {
-        setDomains((all) => [...all, data].sort((a, b) => a.domain.localeCompare(b.domain)));
-        const { data: historyEntry } = await supabase
-          .from("domain_history")
-          .insert({ domain_id: data.id, action: "Added", ...payload })
-          .select("*, domain:domains(domain)")
-          .single();
-        if (historyEntry)
-          setDomainHistory((all) => [
-            { ...historyEntry, domain_name: historyEntry.domain?.domain },
-            ...all,
-          ]);
-      }
-    } else {
-      const domain = { ...payload, id: `D-${domains.length + 1}` };
-      setDomains((all) => [...all, domain].sort((a, b) => a.domain.localeCompare(b.domain)));
-      setDomainHistory((all) => [
-        { ...domain, domain_id: domain.id, domain_name: domain.domain, action: "Added", recorded_at: new Date().toISOString() },
-        ...all,
-      ]);
-    }
     setModal(null);
   }
   async function assignAsset(event) {
@@ -480,12 +420,6 @@ function App() {
             Assets <b>{assets.length}</b>
           </button>
           <button
-            className={tab === "Domains" ? "selected" : ""}
-            onClick={() => setTab("Domains")}
-          >
-            Domains <b>{domains.length}</b>
-          </button>
-          <button
             className={tab === "History" ? "selected" : ""}
             onClick={() => setTab("History")}
           >
@@ -535,16 +469,6 @@ function App() {
           />
         )}
         {tab === "History" && <HistoryTable history={history} />}
-        {tab === "Domains" && (
-          <DomainsRegister
-            domains={domainsShown}
-            allDomains={domains}
-            query={query}
-            setQuery={setQuery}
-            setModal={setModal}
-            openDetail={(domain) => setDetail({ type: "domain", value: domain })}
-          />
-        )}
       </main>
       {modal && (
         <RecordModal
@@ -558,9 +482,7 @@ function App() {
               ? savePerson
               : modal === "asset"
                 ? saveAsset
-                : modal === "domain"
-                  ? saveDomain
-                  : assignAsset
+                : assignAsset
           }
         />
       )}
@@ -569,7 +491,6 @@ function App() {
           detail={detail}
           assets={assets}
           history={history}
-          domainHistory={domainHistory}
           documents={documents}
           close={() => setDetail(null)}
           viewPdf={viewPdf}
@@ -607,7 +528,7 @@ function Sidebar({ tab, setTab, onLogout }) {
         </div>
       </div>
       <nav>
-        {["People", "Assets", "Domains", "History"].map((item) => (
+        {["People", "Assets", "History"].map((item) => (
           <button
             className={tab === item ? "active" : ""}
             onClick={() => setTab(item)}
@@ -630,7 +551,6 @@ function Header({ tab }) {
     People: "Manage people, equipment and acknowledgment records.",
     Assets: "Track inventory, assignment, condition and lifecycle status.",
     History: "Complete asset ownership and lifecycle timeline.",
-    Domains: "Track providers, transfers and domain renewal dates.",
   };
   return (
     <header className="header">
@@ -929,47 +849,8 @@ function HistoryTable({ history }) {
   );
 }
 
-function DomainsRegister({ domains, allDomains, query, setQuery, setModal, openDetail }) {
-  return (
-    <section className="register">
-      <div className="section-heading">
-        <div>
-          <h2>Domain register</h2>
-          <p>{domains.length} of {allDomains.length} domains shown</p>
-        </div>
-        <button className="primary" onClick={() => setModal("domain")}>+ Add domain</button>
-      </div>
-      <div className="toolbar enhanced-toolbar">
-        <label className="search">
-          <span>⌕</span>
-          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search domain or provider..." />
-        </label>
-      </div>
-      <div className="table-wrap">
-        <table>
-          <thead>
-            <tr><th>Domain</th><th>Provider / company</th><th>Transfer date in-house</th><th>Renewal date</th><th>Actions</th></tr>
-          </thead>
-          <tbody>
-            {domains.map((domain) => (
-              <tr key={domain.id}>
-                <td><strong>{domain.domain}</strong><small>{domain.id}</small></td>
-                <td>{domain.provider}</td>
-                <td>{domain.transfer_date || "—"}</td>
-                <td>{domain.renewal_date || "—"}</td>
-                <td><button className="row-action" onClick={() => openDetail(domain)}>History</button></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </section>
-  );
-}
-
-function DetailPanel({ detail, assets, history, domainHistory, documents, close, viewPdf }) {
+function DetailPanel({ detail, assets, history, documents, close, viewPdf }) {
   const isPerson = detail.type === "person";
-  const isDomain = detail.type === "domain";
   const value = detail.value;
   const relatedAssets = isPerson
     ? assets.filter((asset) => asset.assignee === value.name)
@@ -996,19 +877,9 @@ function DetailPanel({ detail, assets, history, domainHistory, documents, close,
           x
         </button>
         <span className="detail-label">
-          {isPerson ? "Person record" : isDomain ? "Domain record" : "Asset record"}
+          {isPerson ? "Person record" : "Asset record"}
         </span>
-        <h2>{isPerson ? value.name : isDomain ? value.domain : `${value.make} ${value.model}`}</h2>
-        {isDomain && (
-          <section>
-            <h3>Domain details</h3>
-            <div className="mini-list">
-              <div><strong>Provider / company</strong><span>{value.provider}</span></div>
-              <div><strong>Transfer date in-house</strong><span>{value.transfer_date || "Not recorded"}</span></div>
-              <div><strong>Renewal date</strong><span>{value.renewal_date || "Not recorded"}</span></div>
-            </div>
-          </section>
-        )}
+        <h2>{isPerson ? value.name : `${value.make} ${value.model}`}</h2>
         {isPerson && (
           <>
             <section>
@@ -1062,22 +933,20 @@ function DetailPanel({ detail, assets, history, domainHistory, documents, close,
           </>
         )}
         <section>
-          <h3>{isDomain ? "Domain history" : isPerson ? "Device history" : "Owner history"}</h3>
-          {(isDomain ? domainHistory.filter((entry) => entry.domain_id === value.id) : relatedHistory).length ? (
+          <h3>{isPerson ? "Device history" : "Owner history"}</h3>
+          {relatedHistory.length ? (
             <div className="history-list">
-              {(isDomain ? domainHistory.filter((entry) => entry.domain_id === value.id) : relatedHistory).map((entry, index) => (
+              {relatedHistory.map((entry, index) => (
                 <div key={entry.id || index}>
                   <span className="history-dot" />
                   <div>
                     <strong>{entry.action}</strong>
                     <p>
-                      {isDomain
-                        ? `${entry.provider || value.provider} · renewal ${entry.renewal_date || "not set"}`
-                        : isPerson
+                      {isPerson
                         ? entry.asset_code || entry.asset_id
                         : entry.person_name || "No person"}{" "}
                       ·{" "}
-                      {new Date(entry.recorded_at || entry.assigned_at).toLocaleDateString("en-ZA")}
+                      {new Date(entry.assigned_at).toLocaleDateString("en-ZA")}
                     </p>
                   </div>
                 </div>
@@ -1110,8 +979,6 @@ function RecordModal({ type, people, assets, locations, close, submit }) {
             ? "Assign asset"
             : type === "person"
               ? "Add person"
-              : type === "domain"
-                ? "Add domain"
               : "Add asset"}
         </h2>
         {type === "person" ? (
@@ -1135,25 +1002,6 @@ function RecordModal({ type, people, assets, locations, close, submit }) {
             <label>
               Email
               <input type="email" name="email" />
-            </label>
-          </div>
-        ) : type === "domain" ? (
-          <div className="form-grid">
-            <label>
-              Domain
-              <input required name="domain" placeholder="example.com" />
-            </label>
-            <label>
-              Provider / company
-              <input required name="provider" />
-            </label>
-            <label>
-              Transfer date in-house
-              <input type="date" name="transferDate" />
-            </label>
-            <label>
-              Renewal date
-              <input type="date" name="renewalDate" />
             </label>
           </div>
         ) : type === "asset" ? (
