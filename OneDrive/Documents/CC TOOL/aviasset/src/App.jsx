@@ -99,6 +99,8 @@ function App() {
   const [tab, setTab] = useState("People");
   const [people, setPeople] = useState(seedPeople);
   const [assets, setAssets] = useState(seedAssets);
+  const [domains, setDomains] = useState([]);
+  const [domainHistory, setDomainHistory] = useState([]);
   const [history, setHistory] = useState([]);
   const [documents, setDocuments] = useState([]);
   const [query, setQuery] = useState("");
@@ -166,6 +168,15 @@ function App() {
           })),
         );
       if (documentResult.data) setDocuments(documentResult.data);
+      if (supabase) {
+        Promise.all([
+          supabase.from("domains").select("*").order("domain"),
+          supabase.from("domain_history").select("*").order("recorded_at", { ascending: false }),
+        ]).then(([domainsResult, domainHistoryResult]) => {
+          if (domainsResult.data) setDomains(domainsResult.data);
+          if (domainHistoryResult.data) setDomainHistory(domainHistoryResult.data);
+        });
+      }
     });
   }, [session]);
 
@@ -199,8 +210,11 @@ function App() {
     .filter((asset) =>
       `${asset.id} ${asset.assignee} ${asset.make} ${asset.model} ${asset.serial || ""}`
         .toLowerCase()
-        .includes(query.toLowerCase()),
+      .includes(query.toLowerCase()),
     );
+  const domainsShown = domains.filter((domain) =>
+    `${domain.domain} ${domain.provider}`.toLowerCase().includes(query.toLowerCase()),
+  );
 
   async function savePerson(event) {
     event.preventDefault();
@@ -349,6 +363,35 @@ function App() {
         { ...payload, id: code, assignee: "Unassigned" },
         ...all,
       ]);
+    setModal(null);
+  }
+  async function saveDomain(event) {
+    event.preventDefault();
+    const values = Object.fromEntries(new FormData(event.currentTarget));
+    const payload = {
+      domain: values.domain.trim().toLowerCase(),
+      provider: values.provider.trim(),
+      transfer_date: values.transferDate || null,
+      renewal_date: values.renewalDate || null,
+    };
+    if (!supabase) {
+      const domain = { ...payload, id: `D-${domains.length + 1}` };
+      setDomains((all) => [...all, domain].sort((a, b) => a.domain.localeCompare(b.domain)));
+      setDomainHistory((all) => [{ ...payload, domain_id: domain.id, action: "Added", recorded_at: new Date().toISOString() }, ...all]);
+      setModal(null);
+      return;
+    }
+    const { data, error } = await supabase.from("domains").insert(payload).select().single();
+    if (error) return window.alert(error.message);
+    if (data) {
+      setDomains((all) => [...all, data].sort((a, b) => a.domain.localeCompare(b.domain)));
+      const { data: historyEntry } = await supabase
+        .from("domain_history")
+        .insert({ domain_id: data.id, action: "Added", ...payload })
+        .select()
+        .single();
+      if (historyEntry) setDomainHistory((all) => [historyEntry, ...all]);
+    }
     setModal(null);
   }
   async function assignAsset(event) {
@@ -535,6 +578,12 @@ function App() {
           >
             Signature <b>{people.length}</b>
           </button>
+          <button
+            className={tab === "Domains" ? "selected" : ""}
+            onClick={() => setTab("Domains")}
+          >
+            Domains <b>{domains.length}</b>
+          </button>
         </div>
         {tab === "People" && (
           <PeopleRegister
@@ -591,6 +640,16 @@ function App() {
         )}
         {tab === "History" && <HistoryTable history={history} />}
         {tab === "Signature" && <SignatureRegister people={people} />}
+        {tab === "Domains" && (
+          <DomainsRegister
+            domains={domainsShown}
+            total={domains.length}
+            query={query}
+            setQuery={setQuery}
+            setModal={setModal}
+            domainHistory={domainHistory}
+          />
+        )}
       </main>
       {modal && (
         <RecordModal
@@ -608,7 +667,9 @@ function App() {
               ? savePerson
               : modal === "asset" || modal === "editAsset"
                 ? saveAsset
-                : assignAsset
+                : modal === "domain"
+                  ? saveDomain
+                  : assignAsset
           }
         />
       )}
@@ -654,7 +715,7 @@ function Sidebar({ tab, setTab, onLogout }) {
         </div>
       </div>
       <nav>
-        {["People", "Assets", "History", "Signature"].map((item) => (
+        {["People", "Assets", "History", "Signature", "Domains"].map((item) => (
           <button
             className={tab === item ? "active" : ""}
             onClick={() => setTab(item)}
@@ -678,6 +739,7 @@ function Header({ tab }) {
     Assets: "Track inventory, assignment, condition and lifecycle status.",
     History: "Complete asset ownership and lifecycle timeline.",
     Signature: "Create downloadable email signatures for every person.",
+    Domains: "Track providers, transfers and domain renewal dates.",
   };
   return (
     <header className="header">
@@ -1019,6 +1081,45 @@ function SignatureCard({ person }) {
   );
 }
 
+function DomainsRegister({ domains, total, query, setQuery, setModal, domainHistory }) {
+  return (
+    <section className="register">
+      <div className="section-heading">
+        <div>
+          <h2>Domain register</h2>
+          <p>{domains.length} of {total} domains shown</p>
+        </div>
+        <button className="primary" onClick={() => setModal("domain")}>+ Add domain</button>
+      </div>
+      <div className="toolbar enhanced-toolbar">
+        <label className="search">
+          <span>⌕</span>
+          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search domain or provider..." />
+        </label>
+      </div>
+      <div className="table-wrap">
+        <table>
+          <thead><tr><th>Domain</th><th>Provider / company</th><th>Transfer date in-house</th><th>Renewal date</th><th>History</th></tr></thead>
+          <tbody>
+            {domains.map((domain) => {
+              const entries = domainHistory.filter((entry) => entry.domain_id === domain.id);
+              return (
+                <tr key={domain.id}>
+                  <td><strong>{domain.domain}</strong><small>{domain.id}</small></td>
+                  <td>{domain.provider}</td>
+                  <td>{domain.transfer_date || "—"}</td>
+                  <td>{domain.renewal_date || "—"}</td>
+                  <td>{entries.length} record{entries.length === 1 ? "" : "s"}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
 function SignatureRegister({ people }) {
   return (
     <section className="register">
@@ -1210,6 +1311,8 @@ function RecordModal({ type, record, people, assets, locations, close, submit })
                 ? "Edit person"
                 : isAssetEdit
                   ? "Edit asset"
+                  : type === "domain"
+                    ? "Add domain"
                   : "Add asset"}
         </h2>
         {type === "person" || isPersonEdit ? (
@@ -1243,6 +1346,25 @@ function RecordModal({ type, record, people, assets, locations, close, submit })
             <label className="checkbox-field">
               <input type="checkbox" name="active" defaultChecked={record?.active !== false} />
               <span>Active employee</span>
+            </label>
+          </div>
+        ) : type === "domain" ? (
+          <div className="form-grid">
+            <label>
+              Domain
+              <input required name="domain" placeholder="example.com" />
+            </label>
+            <label>
+              Provider / company
+              <input required name="provider" />
+            </label>
+            <label>
+              Transfer date in-house
+              <input type="date" name="transferDate" />
+            </label>
+            <label>
+              Renewal date
+              <input type="date" name="renewalDate" />
             </label>
           </div>
         ) : type === "asset" || isAssetEdit ? (
