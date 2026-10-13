@@ -109,6 +109,8 @@ function App() {
   const [statusFilter, setStatusFilter] = useState("All");
   const [locationFilter, setLocationFilter] = useState("All");
   const [peopleStatus, setPeopleStatus] = useState("All");
+  const [signatureQuery, setSignatureQuery] = useState("");
+  const [signatureStatus, setSignatureStatus] = useState("All");
   const [modal, setModal] = useState(null);
   const [editRecord, setEditRecord] = useState(null);
   const [detail, setDetail] = useState(null);
@@ -639,7 +641,15 @@ function App() {
           />
         )}
         {tab === "History" && <HistoryTable history={history} />}
-        {tab === "Signature" && <SignatureRegister people={people} />}
+        {tab === "Signature" && (
+          <SignatureRegister
+            people={people}
+            query={signatureQuery}
+            setQuery={setSignatureQuery}
+            status={signatureStatus}
+            setStatus={setSignatureStatus}
+          />
+        )}
         {tab === "Domains" && (
           <DomainsRegister
             domains={domainsShown}
@@ -1038,7 +1048,10 @@ function SignatureCard({ person }) {
     logo.onload = () => {
       context.fillStyle = "#ffffff";
       context.fillRect(0, 0, canvas.width, canvas.height);
-      context.drawImage(logo, 38, 35, 190, 74);
+      const logoScale = Math.min(190 / logo.naturalWidth, 120 / logo.naturalHeight);
+      const logoWidth = logo.naturalWidth * logoScale;
+      const logoHeight = logo.naturalHeight * logoScale;
+      context.drawImage(logo, 38, (220 - logoHeight) / 2, logoWidth, logoHeight);
       context.fillStyle = "#d8e0e6";
       context.fillRect(255, 35, 1, 150);
       context.fillStyle = "#173f5f";
@@ -1120,17 +1133,37 @@ function DomainsRegister({ domains, total, query, setQuery, setModal, domainHist
   );
 }
 
-function SignatureRegister({ people }) {
+function SignatureRegister({ people, query, setQuery, status, setStatus }) {
+  const shownPeople = people
+    .filter((person) =>
+      status === "All" || (status === "Active" ? person.active !== false : person.active === false),
+    )
+    .filter((person) =>
+      `${person.name} ${person.email || ""} ${person.department || ""} ${person.position || ""}`
+        .toLowerCase()
+        .includes(query.toLowerCase()),
+    );
   return (
     <section className="register">
       <div className="section-heading">
         <div>
           <h2>Email signatures</h2>
-          <p>{people.length} signatures generated automatically</p>
+          <p>{shownPeople.length} of {people.length} signatures shown</p>
         </div>
       </div>
+      <div className="toolbar enhanced-toolbar">
+        <label className="search">
+          <span>⌕</span>
+          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search name, email, department or position..." />
+        </label>
+        <select value={status} onChange={(event) => setStatus(event.target.value)}>
+          <option>All</option>
+          <option>Active</option>
+          <option>Inactive</option>
+        </select>
+      </div>
       <div style={{ display: "grid", gap: 14, padding: "0 24px 24px" }}>
-        {people.map((person) => <SignatureCard key={person.id} person={person} />)}
+        {shownPeople.map((person) => <SignatureCard key={person.id} person={person} />)}
       </div>
     </section>
   );
