@@ -1,12 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "./lib/supabase";
 import AcknowledgmentForm from "./AcknowledgmentForm";
 import "./App.css";
 
 const seedPeople = [
-  { id: "P-001", name: "Ashok", department: "Marketing" },
-  { id: "P-002", name: "Shivani", department: "Management" },
-  { id: "P-003", name: "Darisha", department: "Operations" },
+  { id: "P-001", name: "Ashok", department: "Marketing", active: true },
+  { id: "P-002", name: "Shivani", department: "Management", active: true },
+  { id: "P-003", name: "Darisha", department: "Operations", active: true },
 ];
 const seedAssets = [
   {
@@ -106,6 +106,7 @@ function App() {
   const [assetSection, setAssetSection] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
   const [locationFilter, setLocationFilter] = useState("All");
+  const [peopleStatus, setPeopleStatus] = useState("All");
   const [modal, setModal] = useState(null);
   const [editRecord, setEditRecord] = useState(null);
   const [detail, setDetail] = useState(null);
@@ -144,6 +145,7 @@ function App() {
           peopleResult.data.map((person) => ({
             ...person,
             employeeNumber: person.employee_number,
+            active: person.active !== false,
           })),
         );
       if (assetResult.data?.length)
@@ -174,6 +176,10 @@ function App() {
     ...new Set(people.map((person) => person.department).filter(Boolean)),
   ];
   const peopleShown = people
+    .filter((person) =>
+      peopleStatus === "All" ||
+      (peopleStatus === "Active" ? person.active !== false : person.active === false),
+    )
     .filter(
       (person) => department === "All" || person.department === department,
     )
@@ -205,6 +211,7 @@ function App() {
       department: values.department || null,
       position: values.position || null,
       email: values.email || null,
+      active: values.active === "on",
     };
     if (values.recordId) {
       if (supabase) {
@@ -393,6 +400,20 @@ function App() {
     }
     setModal(null);
   }
+  async function togglePersonActive(person) {
+    const active = person.active === false;
+    if (!window.confirm(`${active ? "Reactivate" : "Mark"} ${person.name} ${active ? "as active" : "as inactive"}?`)) return;
+    if (supabase && isUuid(person.id)) {
+      const { error } = await supabase
+        .from("people")
+        .update({ active })
+        .eq("id", person.id);
+      if (error) return window.alert(error.message);
+    }
+    setPeople((all) =>
+      all.map((item) => (item.id === person.id ? { ...item, active } : item)),
+    );
+  }
   async function markJunk(asset) {
     if (!window.confirm(`Mark ${asset.id} as junk?`)) return;
     const timestamp = new Date().toISOString();
@@ -508,6 +529,12 @@ function App() {
           >
             History <b>{history.length}</b>
           </button>
+          <button
+            className={tab === "Signature" ? "selected" : ""}
+            onClick={() => setTab("Signature")}
+          >
+            Signature <b>{people.length}</b>
+          </button>
         </div>
         {tab === "People" && (
           <PeopleRegister
@@ -519,6 +546,8 @@ function App() {
             setQuery={setQuery}
             department={department}
             setDepartment={setDepartment}
+            peopleStatus={peopleStatus}
+            setPeopleStatus={setPeopleStatus}
             setModal={setModal}
             openAck={(person) =>
               setAck({
@@ -535,6 +564,7 @@ function App() {
               setEditRecord(person);
               setModal("editPerson");
             }}
+            togglePersonActive={togglePersonActive}
           />
         )}
         {tab === "Assets" && (
@@ -560,6 +590,7 @@ function App() {
           />
         )}
         {tab === "History" && <HistoryTable history={history} />}
+        {tab === "Signature" && <SignatureRegister people={people} />}
       </main>
       {modal && (
         <RecordModal
@@ -623,7 +654,7 @@ function Sidebar({ tab, setTab, onLogout }) {
         </div>
       </div>
       <nav>
-        {["People", "Assets", "History"].map((item) => (
+        {["People", "Assets", "History", "Signature"].map((item) => (
           <button
             className={tab === item ? "active" : ""}
             onClick={() => setTab(item)}
@@ -646,6 +677,7 @@ function Header({ tab }) {
     People: "Manage people, equipment and acknowledgment records.",
     Assets: "Track inventory, assignment, condition and lifecycle status.",
     History: "Complete asset ownership and lifecycle timeline.",
+    Signature: "Create downloadable email signatures for every person.",
   };
   return (
     <header className="header">
@@ -668,10 +700,13 @@ function PeopleRegister({
   setQuery,
   department,
   setDepartment,
+  peopleStatus,
+  setPeopleStatus,
   setModal,
   openAck,
   openDetail,
   openEdit,
+  togglePersonActive,
 }) {
   return (
     <section className="register">
@@ -702,6 +737,11 @@ function PeopleRegister({
             <option key={item}>{item}</option>
           ))}
         </select>
+        <select value={peopleStatus} onChange={(event) => setPeopleStatus(event.target.value)}>
+          <option>All</option>
+          <option>Active</option>
+          <option>Inactive</option>
+        </select>
       </div>
       <div className="table-wrap">
         <table>
@@ -709,6 +749,7 @@ function PeopleRegister({
             <tr>
               <th>Person</th>
               <th>Department</th>
+              <th>Status</th>
               <th>Current assets</th>
               <th>Documents</th>
               <th>Actions</th>
@@ -731,6 +772,11 @@ function PeopleRegister({
                     <small>{person.employeeNumber || person.id}</small>
                   </td>
                   <td>{person.department || "—"}</td>
+                  <td>
+                    <span className={`status ${person.active === false ? "status-retired" : "status-assigned"}`}>
+                      {person.active === false ? "Inactive" : "Active"}
+                    </span>
+                  </td>
                   <td>{owned.length}</td>
                   <td>
                     <span className="count-pill">{files.length}</span>
@@ -751,6 +797,9 @@ function PeopleRegister({
                     </button>
                     <button className="row-action" onClick={() => openEdit(person)}>
                       Edit
+                    </button>
+                    <button className="row-action" onClick={() => togglePersonActive(person)}>
+                      {person.active === false ? "Reactivate" : "Make inactive"}
                     </button>
                   </td>
                 </tr>
@@ -784,6 +833,9 @@ function AssetsRegister({
     ["Laptop", allAssets.filter((a) => a.category === "Laptop").length],
     ["Phone", allAssets.filter((a) => a.category === "Phone").length],
     ["Tablet", allAssets.filter((a) => a.category === "Tablet").length],
+    ["Printer", allAssets.filter((a) => a.category === "Printer").length],
+    ["Desktop", allAssets.filter((a) => a.category === "Desktop").length],
+    ["Other", allAssets.filter((a) => a.category === "Other").length],
   ];
   return (
     <>
@@ -913,6 +965,76 @@ function AssetsRegister({
     </>
   );
 }
+
+function SignatureCard({ person }) {
+  const canvasRef = useRef(null);
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const context = canvas.getContext("2d");
+    const logo = new Image();
+    logo.onload = () => {
+      context.fillStyle = "#ffffff";
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      context.drawImage(logo, 38, 35, 190, 74);
+      context.fillStyle = "#d8e0e6";
+      context.fillRect(255, 35, 1, 150);
+      context.fillStyle = "#173f5f";
+      context.font = "700 30px Arial";
+      context.fillText(person.name || "Employee", 285, 72);
+      context.fillStyle = "#667789";
+      context.font = "18px Arial";
+      context.fillText(person.position || person.department || "IBV International Vaults", 285, 105);
+      context.fillStyle = "#173f5f";
+      context.font = "16px Arial";
+      context.fillText(person.email || "", 285, 140);
+      context.fillStyle = "#667789";
+      context.font = "14px Arial";
+      context.fillText("IBV International Vaults  |  www.ibvinternationalvaults.com", 285, 168);
+    };
+    logo.src = "/logo.png";
+  }, [person]);
+  function download() {
+    canvasRef.current.toBlob((blob) => {
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = `${person.name || "employee"}-email-signature.png`.replace(/[^a-z0-9.-]+/gi, "-").toLowerCase();
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+    }, "image/png");
+  }
+  return (
+    <article style={{ background: "#fff", border: "1px solid #e1e8ef", borderRadius: 12, padding: 16, display: "grid", gap: 12 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+        <div>
+          <strong>{person.name}</strong>
+          <small style={{ display: "block", color: "#8492a2", marginTop: 3 }}>{person.email || "No email address"}</small>
+        </div>
+        <button className="row-action primary-row" onClick={download}>Download PNG</button>
+      </div>
+      <div style={{ overflowX: "auto" }}>
+        <canvas ref={canvasRef} width="1000" height="220" style={{ display: "block", width: "1000px", maxWidth: "none", height: "220px", border: "1px solid #edf1f5" }} />
+      </div>
+    </article>
+  );
+}
+
+function SignatureRegister({ people }) {
+  return (
+    <section className="register">
+      <div className="section-heading">
+        <div>
+          <h2>Email signatures</h2>
+          <p>{people.length} signatures generated automatically</p>
+        </div>
+      </div>
+      <div style={{ display: "grid", gap: 14, padding: "0 24px 24px" }}>
+        {people.map((person) => <SignatureCard key={person.id} person={person} />)}
+      </div>
+    </section>
+  );
+}
+
 function HistoryTable({ history }) {
   return (
     <section className="register">
@@ -1118,6 +1240,10 @@ function RecordModal({ type, record, people, assets, locations, close, submit })
               Email
               <input type="email" name="email" defaultValue={record?.email || ""} />
             </label>
+            <label className="checkbox-field">
+              <input type="checkbox" name="active" defaultChecked={record?.active !== false} />
+              <span>Active employee</span>
+            </label>
           </div>
         ) : type === "asset" || isAssetEdit ? (
           <div className="form-grid">
@@ -1203,7 +1329,7 @@ function RecordModal({ type, record, people, assets, locations, close, submit })
             <label>
               Person
               <select name="personId">
-                {people.map((person) => (
+                {people.filter((person) => person.active !== false).map((person) => (
                   <option value={person.id} key={person.id}>
                     {person.name}
                   </option>

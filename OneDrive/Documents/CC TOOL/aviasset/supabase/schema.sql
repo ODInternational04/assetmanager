@@ -3,7 +3,7 @@ create extension if not exists pgcrypto;
 create table if not exists public.assets (
   id uuid primary key default gen_random_uuid(),
   asset_code text not null unique,
-  category text not null check (category in ('Laptop', 'Phone', 'Tablet', 'Other')),
+  category text not null check (category in ('Laptop', 'Phone', 'Tablet', 'Printer', 'Desktop', 'Other')),
   site text not null,
   assignee text,
   department text,
@@ -27,6 +27,7 @@ create table if not exists public.people (
   department text,
   position text,
   email text,
+  active boolean not null default true,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -46,6 +47,10 @@ alter table public.assets add constraint assets_status_check
 alter table public.assets add column if not exists purchase_date date;
 alter table public.assets add column if not exists purchase_value numeric(12, 2);
 alter table public.assets add column if not exists on_contract boolean not null default false;
+alter table public.assets drop constraint if exists assets_category_check;
+alter table public.assets add constraint assets_category_check
+  check (category in ('Laptop', 'Phone', 'Tablet', 'Printer', 'Desktop', 'Other'));
+alter table public.people add column if not exists active boolean not null default true;
 
 alter table public.assignment_history drop constraint if exists assignment_history_action_check;
 alter table public.assignment_history alter column person_id drop not null;
